@@ -1,24 +1,19 @@
 # twinny
 
-<br>
-
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama) or [llama.cpp](https://github.com/ggerganov/llama.cpp). Like Github Copilot but 100% free and 100% private.
-
-<br>
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [Ollama Web UI](https://github.com/ollama-webui/ollama-webui), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
-      Install the twinny vscode extension
+      Install the twinny Visual Studio Code extension
     </p>
     <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
       <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
     </a>
 </div>
 
+### Main features 
 
-### How twinny helps developers
-
-Fast and accurate code completion:
+Fill in the middle code completion:
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
 
@@ -28,71 +23,45 @@ Chat with AI about your code
 
 #### Other features 
 
-- Free
-- Private
-- Auto code completion
-- Configurable single or multiline completions
-- Fast and accurate
-- Multiple language support
-- Configurable prompt templates
-- Easy to install
-- Configurable endpoint and port and path for completion API
-- Chat feature like Copilot Chat
-- Accept solution directly to editor
+- Single or multiline fill-in-middle completions
+- Customisable prompt templates to add context to completions
+- Easy installation via vscode extensions marketplace or by downloading and running a binary directly
+- Customisable settings to change API provider, model name, port number and path 
+- Ollama, llamacpp, oobabooga and LM Studio API compatible
+- Accept code solutions directly to editor
+- Create new documents from code blocks
 - Copy generated code solution blocks
-- Chat history preserved per conversation
+- Chat history preserved per workspace 
 
 ## 🚀 Getting Started
 
 ### Easy Installation
 
-You can install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
+Install the verified extension via the Visual Studio Code marketplace by clicking [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code.
 
-Twinny is configured to use Ollama by deafult. Therefore, when installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle" completions. 
+Twinny is configured to use the Ollama API by default, however you can change this to use llama.cpp, LM Studio or Oobabooga by changing the API provider in the extension settings. You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
 
-If you already have Ollama installed or you want to use llama.cpp instead, you can cancel the automatic setup of Ollama and proceed to update the values inside twinny extension settings to point to your existing models and server.
+Twinny supports the OpenAI API specification so in theory any API should work with Twinny as long as it supports the OpenAI specification.  If you find that isn't the case please open an issue with details of how you are having problems.
 
-You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
+When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use. These options can also be set manually.
 
-The main values which need to be updated to switch between Ollama and llama.cpp are:
+The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
 
-- `apiUrl` - The url to your Ollama or llama.cpp server (default: localhost)
-- `apiPath` - The API path which defaults to `/api/generate` for Ollama and `/completion` for llama.cpp (See llama.cpp docs or Ollama docs).
-- `apiPort` - The port of your Ollama (default 11434) or llama.cpp server (default 8080)
+When the extension is ready you will see a `🤖` icon at the bottom of your code editor indicating that twinny is ready to use.
 
-If you are using llama.cpp - The twinny settings for FIM model name and Chat model name will be ignored, as this should already be configured when running the llama.cpp server.
+Enjoy enhanced code completions and chat with twinny! 🎉
 
-When the extension is ready you will see a `🤖` icon at the bottom of your code editor.
+## Model support
 
-You will also see which models are being used (only applicable to Ollama hosted servers).
+**Fill in the middle (FIM) completions**
 
-That's it! Enjoy enhanced code completions and chat with twinny! 🎉
+- If using Llama the model must support the Llama special tokens.
+- If using deepseek use a base model for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
+- If using stable code `stable-code:code` has been tested and works well.
 
-## Tested and supported Ollama models
+**Chat**
 
-twinny and Ollama have been tested and are working on Linux with a 3090 with the following models:
-
-- codellama `instruct` for chat and `code` for FIM. (https://ollama.ai/library/codellama)
-- phind-codellama for chat (https://ollama.ai/library/phind-codellama)
-- deepseek-coder:6.7b-base-q5_K_M and deepseek-coder:base for FIM
-
-For FIM 
-
-- The model must support the llama special tokens for prefix and suffix if using codellama models.
-- Only use deepseek base models for FIM completions for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
-- For stable-code `stable-code:code` has been tested and works for FIM.
-
-For chat 
-
-- All llama models should work, although any model will probably work too, results may vary if the special tokens are different from Llama.
-- Prompt templates will need to be updated if using different models due to special tokens see known issues section.
-
-## Tested and supported llama.cpp models
-
-twinny and llama.ccp has been tested and are working with the following models:
- 
-- https://huggingface.co/TheBloke/CodeLlama-7B-GGUF 
-- https://huggingface.co/TheBloke/CodeLlama-13B-GGUF
+- All models should work for chat generations but the templates might need editing if using something other than codellama and updated with the special tokens.
 
 ## Keyboard shortcuts
 
@@ -102,18 +71,18 @@ twinny and llama.ccp has been tested and are working with the following models:
 | `CTRL+SHIFT+t`               | Open twinny sidebar                      |
 | `CTRL+SHIFT+/`               | Stop code generation                     | 
 
+## Workspace context
+
+In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default but I'm considering turning this on by default in the next release.
 
 ## Known issues
 
-- There are some issues running this extension on Windows in general 
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
-- Some models may not support the special tokens of llama which means they would not work correctly for FIM completions.
-- Sometimes a restart of vscode is required for new settings to take effect
-- FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint (i.e spit out garbage chat/fim completions), so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
-- Using file context often causes incorrect completions for FIM completions because small models get confused when provided with more than one file context.
-- If using stable-code or deekseek for instruct prompt-templates need to be updated.
+- Sometimes a restart of vscode is required for new settings to take effect, please open an issue if you are having problems with this.
+- Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
+- See open issues on github to see any known issues that are not yet fixed.
   
-If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
+If you have a problem with Twinny or have any suggestions please report them on github issues.  Please include your vscode version and OS details in your issue.
 
 ## Contributing
 
@@ -122,3 +91,7 @@ We are actively looking for contributors who want to help improve the project, i
 Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
 This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
+
+## Disclaimer
+
+This plugin is provided "as is" and is under active development.  This means that at times it may not work fully as expected.

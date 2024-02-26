@@ -1,18 +1,25 @@
 import * as vscode from 'vscode'
-import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
-import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+
+import { getLanguage, getTextSelection, getTheme } from '../utils'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
-import { ClientMessage, MessageType, ServerMessage } from '../types'
+import {
+  ClientMessage,
+  MessageType,
+  OllamaModel,
+  ServerMessage
+} from '../../common/types'
 import { TemplateProvider } from '../template-provider'
+import { OllamaService } from '../ollama-service'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
-  view?: vscode.WebviewView
-  _doc?: vscode.TextDocument
-  public chatService: ChatService | undefined = undefined
+  private _context: vscode.ExtensionContext
   private _statusBar: vscode.StatusBarItem
-  private context: vscode.ExtensionContext
   private _templateDir: string
   private _templateProvider: TemplateProvider
+  private _ollamaService: OllamaService | undefined = undefined
+  public chatService: ChatService | undefined = undefined
+  public view?: vscode.WebviewView
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -20,9 +27,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     templateDir: string
   ) {
     this._statusBar = statusBar
-    this.context = context
+    this._context = context
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
+    this._ollamaService = new OllamaService()
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -35,7 +43,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this.context?.extensionUri]
+      localResourceRoots: [this._context?.extensionUri]
     }
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
@@ -67,24 +75,56 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         message: ClientMessage<string | boolean> & ClientMessage<MessageType[]>
       ) => {
         const eventHandlers = {
-          [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
-          [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
-          [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
-          [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
           [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
+          [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
+          [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
+          [MESSAGE_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
           [MESSAGE_NAME.twinnyGlobalContext]: this.getGlobalContext,
-          [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-          [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
-          [MESSAGE_NAME.twinnySetWorkspaceContext]:
-            this.setTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates,
+          [MESSAGE_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
+          [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
           [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
-          [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
-          [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates
+          [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
+          [MESSAGE_NAME.twinnySetWorkspaceContext]:
+            this.setTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
+          [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySetConfigValue]: this.setConfigurationValue,
+          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
+  }
+
+  public getConfigurationValue = (data: ClientMessage) => {
+    if (!data.key) return
+    const config = vscode.workspace.getConfiguration('twinny')
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyGetConfigValue,
+      value: {
+        data: config.get(data.key as string),
+        type: data.key
+      }
+    } as ServerMessage<string>)
+  }
+
+  public setConfigurationValue = (data: ClientMessage) => {
+    if (!data.key) return
+    const config = vscode.workspace.getConfiguration('twinny')
+    config.update(data.key, data.data, vscode.ConfigurationTarget.Global)
+  }
+
+  public fetchOllamaModels = async () => {
+    const models = await this._ollamaService?.fetchModels()
+    if (!models) return
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyFetchOllamaModels,
+      value: {
+        data: models.models
+      }
+    } as ServerMessage<OllamaModel[]>)
   }
 
   public listTemplates = () => {
@@ -102,18 +142,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public clickSuggestion = (data: ClientMessage) => {
-    vscode.commands.executeCommand('twinny.templateCompletion', data.data as string)
+    vscode.commands.executeCommand(
+      'twinny.templateCompletion',
+      data.data as string
+    )
   }
 
   public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
     this.chatService?.streamChatCompletion(data.data || [])
-  }
-
-  public openDiff = (data: ClientMessage) => {
-    const editor = vscode.window.activeTextEditor
-    const selection = editor?.selection
-    const text = editor?.document.getText(selection)
-    openDiffView(text || '', data.data as string)
   }
 
   public getSelectedText = () => {
@@ -135,8 +171,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  public createNewUntitledDocument = async (data: ClientMessage) => {
+    const lang = getLanguage()
+    const document = await vscode.workspace.openTextDocument({
+      content: data.data as string,
+      language: lang.languageId
+    })
+    await vscode.window.showTextDocument(document)
+  }
+
   public getGlobalContext = (data: ClientMessage) => {
-    const storedData = this.context?.globalState.get(
+    const storedData = this._context?.globalState.get(
       `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`
     )
     this.view?.webview.postMessage({
@@ -164,14 +209,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public setGlobalContext = (data: ClientMessage) => {
-    this.context?.globalState.update(
+    this._context?.globalState.update(
       `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
       data.data
     )
   }
 
   public getTwinnyWorkspaceContext = (data: ClientMessage) => {
-    const storedData = this.context?.workspaceState.get(
+    const storedData = this._context?.workspaceState.get(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
     )
     this.view?.webview.postMessage({
@@ -182,7 +227,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   public setTwinnyWorkspaceContext = <T>(data: ClientMessage<T>) => {
     const value = data.data
-    this.context.workspaceState.update(
+    this._context.workspaceState.update(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
       value
     )
@@ -201,18 +246,36 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private _getHtmlForWebview(webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
+      vscode.Uri.joinPath(this._context.extensionUri, 'out', 'sidebar.js')
     )
+
+    const codiconCssUri = vscode.Uri.joinPath(
+      this._context.extensionUri,
+      'assets',
+      'codicon.css'
+    )
+
+    const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
 
     const nonce = getNonce()
 
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
+        <link href="${codiconCssWebviewUri}" rel="stylesheet">
         <meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
+				<meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'self' http://localhost:11434;
+          img-src vscode-resource: https:;
+          font-src vscode-webview-resource:;
+          script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;"
+        >
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sidebar</title>
+        <style>
+          body { padding: 10px }
+        </style>
     </head>
     <body>
         <div id="root"></div>
